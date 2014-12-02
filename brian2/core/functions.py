@@ -248,14 +248,14 @@ class FunctionImplementationContainer(collections.Mapping):
                                                orig_func.func_name,
                                                orig_func.func_defaults,
                                                orig_func.func_closure)
-            self._implementations[NumpyCodeObject] = FunctionImplementation(name=None,
-                                                                            code=unitless_func,
-                                                                            dependencies=dependencies)
+            self._implementations['numpy'] = FunctionImplementation(name=None,
+                                                                    code=unitless_func,
+                                                                    dependencies=dependencies)
         else:
             def wrapper_function(*args):
                 if not len(args) == len(self._function._arg_units):
                     raise ValueError(('Function %s got %d arguments, '
-                                      'expected %d') % (self._function.name, len(args),
+                                      'expected %d') % (self._function.pyfunc.__name__, len(args),
                                                         len(self._function._arg_units)))
                 new_args = [Quantity.with_dimensions(arg, get_dimensions(arg_unit))
                             for arg, arg_unit in zip(args, self._function._arg_units)]
@@ -263,9 +263,9 @@ class FunctionImplementationContainer(collections.Mapping):
                 fail_for_dimension_mismatch(result, self._function._return_unit)
                 return np.asarray(result)
 
-            self._implementations[NumpyCodeObject] = FunctionImplementation(name=None,
-                                                                            code=wrapper_function,
-                                                                            dependencies=dependencies)
+            self._implementations['numpy'] = FunctionImplementation(name=None,
+                                                                    code=wrapper_function,
+                                                                    dependencies=dependencies)
 
     def add_implementation(self, target, code, namespace=None,
                            dependencies=None, name=None):
