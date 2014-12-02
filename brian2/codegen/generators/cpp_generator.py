@@ -235,6 +235,40 @@ class CPPCodeGenerator(CodeGenerator):
         else:
             return ''
 
+    def add_function_code(self, user_functions, function, func_name):
+        user_functions.append((func_name, function))
+        impl = function.implementations[self.codeobj_class]
+        funccode = impl.get_code(self.owner)
+        if isinstance(funccode, basestring):
+            funccode = {'support_code': funccode}
+        if funccode is not None:
+            support_code = '\n' + deindent(funccode.get('support_code', ''))
+            hash_defines = '\n' + deindent(funccode.get('hashdefine_code', ''))
+        else:
+            support_code, hash_defines = '', ''
+        # add the Python function with a leading '_python', if it
+        # exists. This allows the function to make use of the Python
+        # function via weave if necessary (e.g. in the case of randn)
+        if not function.pyfunc is None:
+            pyfunc_name = '_python_' + func_name
+            if pyfunc_name in self.variables:
+                logger.warn(('Namespace already contains function %s, '
+                             'not replacing it') % pyfunc_name)
+            else:
+                self.variables[pyfunc_name] = function.pyfunc
+
+        dependency_hash_defines = ''
+        dependency_support_code = ''
+        if impl.dependencies is not None:
+            for dependency_name, dependency in impl.dependencies.iteritems():
+                hd, sp = self.add_function_code(user_functions, dependency,
+                                                dependency_name)
+                dependency_hash_defines += hd
+                dependency_support_code += sp
+
+        return (dependency_hash_defines + hash_defines,
+                dependency_support_code + support_code)
+
     def determine_keywords(self):
         # set up the restricted pointers, these are used so that the compiler
         # knows there is no aliasing in the pointers, for optimisation
@@ -268,28 +302,17 @@ class CPPCodeGenerator(CodeGenerator):
         hash_defines = ''
         for varname, variable in self.variables.items():
             if isinstance(variable, Function):
-                user_functions.append((varname, variable))
-                funccode = variable.implementations[self.codeobj_class].get_code(self.owner)
-                if isinstance(funccode, basestring):
-                    funccode = {'support_code': funccode}
-                if funccode is not None:
-                    support_code += '\n' + deindent(funccode.get('support_code', ''))
-                    hash_defines += '\n' + deindent(funccode.get('hashdefine_code', ''))
-                # add the Python function with a leading '_python', if it
-                # exists. This allows the function to make use of the Python
-                # function via weave if necessary (e.g. in the case of randn)
-                if not variable.pyfunc is None:
-                    pyfunc_name = '_python_' + varname
-                    if pyfunc_name in self.variables:
-                        logger.warn(('Namespace already contains function %s, '
-                                     'not replacing it') % pyfunc_name)
-                    else:
-                        self.variables[pyfunc_name] = variable.pyfunc
+                hd, sp = self.add_function_code(user_functions,
+                                                variable,
+                                                varname)
+                hash_defines += hd
+                support_code += sp
 
         # delete the user-defined functions from the namespace and add the
         # function namespaces (if any)
         for funcname, func in user_functions:
-            del self.variables[funcname]
+            if funcname in self.variables:
+                del self.variables[funcname]
             func_namespace = func.implementations[self.codeobj_class].get_namespace(self.owner)
             if func_namespace is not None:
                 self.variables.update(func_namespace)

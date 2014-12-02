@@ -105,6 +105,31 @@ class CythonCodeGenerator(CodeGenerator):
 
         return lines
 
+    def add_function_code(self, load_namespace, support_code, function,
+                          func_name):
+        impl = function.implementations[self.codeobj_class]
+        func_impl = impl.get_code(self.owner)
+
+        if impl.dependencies is not None:
+            for dependency_name, dependency in impl.dependencies.iteritems():
+                self.add_function_code(load_namespace, support_code,
+                                       dependency, dependency_name)
+
+        # Implementation can be None if the function is already
+        # available in Cython (possibly under a different name)
+        if func_impl is not None:
+            if isinstance(func_impl, basestring):
+                # Function is provided as Cython code
+                support_code.append(deindent(func_impl))
+            elif callable(func_impl):
+                self.variables[func_name] = func_impl
+                line = '%s = _namespace["%s"]' % (func_name, func_name)
+                load_namespace.append(line)
+            else:
+                raise TypeError(('Provided function implementation '
+                                 'for function %s is neither a string '
+                                 'nor callable') % func_name)
+
     def translate_statement_sequence(self, statements):
         from brian2.devices.device import get_device
         device = get_device()
@@ -172,21 +197,8 @@ class CythonCodeGenerator(CodeGenerator):
                 handled_pointers.add(pointer_name)
 
             elif isinstance(var, Function):
-                func_impl = var.implementations[self.codeobj_class].get_code(self.owner)
-                # Implementation can be None if the function is already
-                # available in Cython (possibly under a different name)
-                if func_impl is not None:
-                    if isinstance(func_impl, basestring):
-                        # Function is provided as Cython code
-                        support_code.append(deindent(func_impl))
-                    elif callable(func_impl):
-                        self.variables[varname] = func_impl
-                        line = '%s = _namespace["%s"]' % (varname, varname)
-                        load_namespace.append(line)
-                    else:
-                        raise TypeError(('Provided function implementation '
-                                         'for function %s is neither a string '
-                                         'nor callable') % varname)
+                self.add_function_code(load_namespace, support_code, var,
+                                       varname)
             else:
                 # fallback to Python object
                 print var
