@@ -7,6 +7,7 @@ from collections import OrderedDict
 import weakref
 
 import numpy as np
+import pandas as pd
 
 from brian2.core.base import BrianObject
 from brian2.core.preferences import prefs
@@ -445,7 +446,7 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        if format != 'dict':
+        if format != 'dict' or format != 'DataFrame':
             raise NotImplementedError("Format '%s' is not supported" % format)
         if vars is None:
             vars = [name for name in self.variables.iterkeys()
@@ -455,6 +456,9 @@ class Group(BrianObject):
             data[var] = np.array(self.state(var, use_units=units,
                                             level=level+1),
                                  copy=True, subok=True)
+        if format == 'DataFrame':
+            return pd.DataFrame(data)
+
         return data
 
     def set_states(self, values, units=True, format='dict', level=0):
@@ -475,8 +479,10 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        if format != 'dict':
+        if format != 'dict' or format != 'DataFrame':
             raise NotImplementedError("Format '%s' is not supported" % format)
+        if format == 'DataFrame':
+            values = values.to_dict()
         for key, value in values.iteritems():
             self.state(key, use_units=units, level=level+1)[:] = value
 
