@@ -7,6 +7,7 @@ from collections import OrderedDict
 import weakref
 
 import numpy as np
+import pandas as pd
 
 from brian2.core.base import BrianObject
 from brian2.core.preferences import prefs
@@ -24,6 +25,7 @@ from brian2.units.fundamentalunits import (fail_for_dimension_mismatch, Unit,
 from brian2.units.allunits import second
 from brian2.utils.logger import get_logger
 from brian2.utils.stringtools import get_identifiers, SpellChecker
+from brian2.ImportExport.base import ImportExport
 
 __all__ = ['Group', 'CodeRunner']
 
@@ -445,17 +447,24 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        if format != 'dict':
-            raise NotImplementedError("Format '%s' is not supported" % format)
-        if vars is None:
-            vars = [name for name in self.variables.iterkeys()
-                    if not name.startswith('_')]
-        data = {}
-        for var in vars:
-            data[var] = np.array(self.state(var, use_units=units,
-                                            level=level+1),
-                                 copy=True, subok=True)
-        return data
+        exporter = ImportExport.determine_importexport_type(format)
+        return exporter.export_data(self, vars, units, level)
+
+# 
+        # if format != 'dict' or format != 'DataFrame':
+        #     raise NotImplementedError("Format '%s' is not supported" % format)
+        # if vars is None:
+        #     vars = [name for name in self.variables.iterkeys()
+        #             if not name.startswith('_')]
+        # data = {}
+        # for var in vars:
+        #     data[var] = np.array(self.state(var, use_units=units,
+        #                                     level=level+1),
+        #                          copy=True, subok=True)
+        # if format == 'DataFrame':
+        #     return pd.DataFrame(data)
+
+        # return data
 
     def set_states(self, values, units=True, format='dict', level=0):
         '''
@@ -475,10 +484,15 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        if format != 'dict':
-            raise NotImplementedError("Format '%s' is not supported" % format)
-        for key, value in values.iteritems():
-            self.state(key, use_units=units, level=level+1)[:] = value
+        importer = ImportExport.determine_importexport_type(format)
+        self.state = importer.import_data(self, vars, units, level)
+        
+        # if format != 'dict' or format != 'DataFrame':
+        #     raise NotImplementedError("Format '%s' is not supported" % format)
+        # if format == 'DataFrame':
+        #     values = values.to_dict()
+        # for key, value in values.iteritems():
+        #     self.state(key, use_units=units, level=level+1)[:] = value
 
     def _store(self, name='default'):
         logger.debug('Storing state at for object %s' % self.name)
