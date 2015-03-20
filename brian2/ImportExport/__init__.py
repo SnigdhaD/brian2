@@ -1,5 +1,5 @@
 from .base import *
 from .formats import *
 
-ImportExport.register('dict', Dict)
-ImportExport.register('pandas', Pandas)
+import_export.register('dict', Dict)
+import_export.register('pandas', Pandas)

@@ -25,8 +25,7 @@ from brian2.units.fundamentalunits import (fail_for_dimension_mismatch, Unit,
 from brian2.units.allunits import second
 from brian2.utils.logger import get_logger
 from brian2.utils.stringtools import get_identifiers, SpellChecker
-from brian2.ImportExport.base import ImportExport
-
+from brian2.ImportExport.base import import_export
 __all__ = ['Group', 'CodeRunner']
 
 logger = get_logger(__name__)
@@ -310,7 +309,6 @@ class Group(BrianObject):
             var = self.variables[name]
         except KeyError:
             raise KeyError("State variable "+name+" not found.")
-
         if use_units:
             return var.get_addressable_value_with_unit(name=name, group=self)
         else:
@@ -447,7 +445,10 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        exporter = ImportExport.determine_importexport_type(format)
+        if vars is None:
+            vars = [name for name in self.variables.iterkeys()
+                    if not name.startswith('_')]
+        exporter = import_export.determine_importexport_type(format)
         return exporter.export_data(self, vars, units, level)
 
 # 
@@ -484,7 +485,7 @@ class Group(BrianObject):
         '''
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
-        importer = ImportExport.determine_importexport_type(format)
+        importer = import_export.determine_importexport_type(format)
         self.state = importer.import_data(self, vars, units, level)
         
         # if format != 'dict' or format != 'DataFrame':
