@@ -12,7 +12,7 @@ import pandas as pd
 from brian2.core.base import BrianObject
 from brian2.core.preferences import prefs
 from brian2.core.variables import (Variables, Constant, Variable,
-                                   ArrayVariable, DynamicArrayVariable)
+                                   ArrayVariable, DynamicArrayVariable, AuxiliaryVariable)
 from brian2.core.functions import Function
 from brian2.core.namespace import (get_local_namespace,
                                    DEFAULT_FUNCTIONS,
@@ -25,7 +25,7 @@ from brian2.units.fundamentalunits import (fail_for_dimension_mismatch, Unit,
 from brian2.units.allunits import second
 from brian2.utils.logger import get_logger
 from brian2.utils.stringtools import get_identifiers, SpellChecker
-from brian2.ImportExport.base import import_export
+from brian2.import_export.base import ImportExport
 __all__ = ['Group', 'CodeRunner']
 
 logger = get_logger(__name__)
@@ -443,29 +443,11 @@ class Group(BrianObject):
             The variables specified in ``vars``, in the specified ``format``.
 
         '''
-        # For the moment, 'dict' is the only supported format -- later this will
-        # be made into an extensible system, see github issue #306
         if vars is None:
-            vars = [name for name in self.variables.iterkeys()
-                    if not name.startswith('_')]
-        exporter = import_export.determine_importexport_type(format)
+            vars = [name for name, var in self.variables.iteritems()
+                    if not (name.startswith('_') or isinstance(var, AuxiliaryVariable))]
+        exporter = ImportExport.determine_importexport_type(format)
         return exporter.export_data(self, vars, units, level)
-
-# 
-        # if format != 'dict' or format != 'DataFrame':
-        #     raise NotImplementedError("Format '%s' is not supported" % format)
-        # if vars is None:
-        #     vars = [name for name in self.variables.iterkeys()
-        #             if not name.startswith('_')]
-        # data = {}
-        # for var in vars:
-        #     data[var] = np.array(self.state(var, use_units=units,
-        #                                     level=level+1),
-        #                          copy=True, subok=True)
-        # if format == 'DataFrame':
-        #     return pd.DataFrame(data)
-
-        # return data
 
     def set_states(self, values, units=True, format='dict', level=0):
         '''
@@ -483,17 +465,8 @@ class Group(BrianObject):
             How much higher to go up the stack to resolve external variables.
             Only relevant when using string expressions to set values.
         '''
-        # For the moment, 'dict' is the only supported format -- later this will
-        # be made into an extensible system, see github issue #306
-        importer = import_export.determine_importexport_type(format)
+        importer = ImportExport.determine_importexport_type(format)
         self.state = importer.import_data(self, vars, units, level)
-        
-        # if format != 'dict' or format != 'DataFrame':
-        #     raise NotImplementedError("Format '%s' is not supported" % format)
-        # if format == 'DataFrame':
-        #     values = values.to_dict()
-        # for key, value in values.iteritems():
-        #     self.state(key, use_units=units, level=level+1)[:] = value
 
     def _store(self, name='default'):
         logger.debug('Storing state at for object %s' % self.name)
